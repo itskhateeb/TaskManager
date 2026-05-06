@@ -45,7 +45,7 @@ const taskSchema = new mongoose.Schema({
   }
 });
 
-// Update status to overdue if dueDate passed and not completed
+// Auto-update status to overdue if dueDate passed and not completed
 taskSchema.pre('save', function(next) {
   if (this.status !== 'completed' && this.dueDate < new Date()) {
     this.status = 'overdue';
