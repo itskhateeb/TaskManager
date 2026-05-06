@@ -16,34 +16,21 @@ router.get('/users', auth, roleCheck('admin'), async (req, res) => {
   }
 });
 
-// Create user (Admin only) - FIXED VERSION
+// Create user (Admin only)
 router.post('/users', auth, roleCheck('admin'), async (req, res) => {
   try {
     const { name, email, password, role } = req.body;
     
-    console.log('=== Admin Creating User ===');
-    console.log('Name:', name);
-    console.log('Email:', email);
-    console.log('Role:', role);
-    console.log('Raw password:', password);
-    
     // Check if user exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
-      console.log('User already exists:', email);
       return res.status(400).json({ error: 'Email already exists' });
     }
     
-    // Validate password
-    if (!password || password.length < 6) {
-      return res.status(400).json({ error: 'Password must be at least 6 characters' });
-    }
-    
-    // Hash the password using the SAME method as signup
+    // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
-    console.log('Hashed password:', hashedPassword);
     
-    // Create user with hashed password
+    // Create user
     const user = new User({
       name,
       email,
@@ -52,26 +39,15 @@ router.post('/users', auth, roleCheck('admin'), async (req, res) => {
     });
     
     await user.save();
-    console.log('User saved successfully with hashed password');
-    
-    // Verify the password was saved correctly
-    const savedUser = await User.findOne({ email });
-    console.log('Verification - Password in DB:', savedUser.password);
-    console.log('Verification - Password hash length:', savedUser.password.length);
-    
-    // Test if password matches
-    const testMatch = await bcrypt.compare(password, savedUser.password);
-    console.log('Test password match:', testMatch);
     
     res.status(201).json({ 
       message: 'User created successfully', 
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        createdAt: user.createdAt
-      }
+      user: { 
+        id: user._id, 
+        name: user.name, 
+        email: user.email, 
+        role: user.role 
+      } 
     });
   } catch (error) {
     console.error('Error creating user:', error);
@@ -89,11 +65,43 @@ router.delete('/users/:id', auth, roleCheck('admin'), async (req, res) => {
     }
     
     await user.deleteOne();
-    console.log('User deleted:', user.email);
     res.json({ message: 'User deleted successfully' });
   } catch (error) {
     console.error('Error deleting user:', error);
     res.status(500).json({ error: error.message });
+  }
+});
+
+// Update user role (Admin only)
+router.put('/users/:id/role', auth, roleCheck('admin'), async (req, res) => {
+  try {
+    const { role } = req.body;
+    
+    if (!role || !['admin', 'member'].includes(role)) {
+      return res.status(400).json({ error: 'Invalid role' });
+    }
+    
+    const user = await User.findById(req.params.id);
+    
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    user.role = role;
+    await user.save();
+    
+    res.json({ 
+      message: 'User role updated successfully', 
+      user: { 
+        id: user._id, 
+        name: user.name, 
+        email: user.email, 
+        role: user.role 
+      } 
+    });
+  } catch (error) {
+    console.error('Error updating user role:', error);
+    res.status(400).json({ error: error.message });
   }
 });
 
