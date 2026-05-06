@@ -1,0 +1,19 @@
+echo "# Dependencies
+node_modules/
+.env
+.DS_Store
+dist/
+build/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+Thumbs.db" > .gitignoreecho "# Team Task Manager
+
