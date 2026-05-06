@@ -1,8 +1,13 @@
 import axios from 'axios';
 
 const API = axios.create({
-  baseURL: '/api',
+  baseURL:
+    window.location.hostname === 'localhost'
+      ? 'http://localhost:5000/api'
+      : '/api',
+
   timeout: 10000,
+
   headers: {
     'Content-Type': 'application/json'
   }
@@ -12,23 +17,28 @@ const API = axios.create({
 API.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
+
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+
     return config;
   },
-  (error) => {
-    return Promise.reject(error);
-  }
+
+  (error) => Promise.reject(error)
 );
 
-// Response interceptor for debugging
+// Response interceptor
 API.interceptors.response.use(
-  (response) => {
-    return response;
-  },
+  (response) => response,
+
   (error) => {
-    console.error('API Error:', error.response?.status, error.response?.data);
+    console.error(
+      'API Error:',
+      error.response?.status,
+      error.response?.data
+    );
+
     return Promise.reject(error);
   }
 );
