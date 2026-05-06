@@ -104,7 +104,6 @@ const Projects = () => {
       
       alert('Task created successfully!');
       setShowTaskModal(false);
-      // Refresh the project details to show the new task
       await fetchProjectDetails(selectedProject.project._id);
       
       setTaskData({
@@ -136,26 +135,16 @@ const Projects = () => {
     }
   };
 
-const updateTaskStatus = async (taskId, newStatus) => {
-  try {
-    console.log('Updating task:', taskId, 'to status:', newStatus);
-    
-    const response = await API.patch(`/tasks/${taskId}/status`, { status: newStatus });
-    console.log('Update response:', response.data);
-    
-    // Refresh the project details to show updated status
-    if (selectedProject) {
-      const { data } = await API.get(`/projects/${selectedProject.project._id}`);
-      setSelectedProject(data);
+  const updateTaskStatus = async (taskId, newStatus) => {
+    try {
+      await API.patch(`/tasks/${taskId}/status`, { status: newStatus });
+      alert(`Task status updated to ${newStatus}!`);
+      await fetchProjectDetails(selectedProject.project._id);
+    } catch (error) {
+      console.error('Error updating task:', error);
+      alert('Failed to update task status');
     }
-    
-    alert(`Task status updated to ${newStatus}!`);
-  } catch (error) {
-    console.error('Error updating task:', error);
-    const errorMessage = error.response?.data?.error || 'Failed to update task status';
-    alert(errorMessage);
-  }
-};
+  };
 
   const getStatusColor = (status) => {
     const colors = {
@@ -340,7 +329,7 @@ const updateTaskStatus = async (taskId, newStatus) => {
                         <select
                           value={task.status}
                           onChange={(e) => updateTaskStatus(task._id, e.target.value)}
-                          className="text-sm border border-gray-300 rounded-md px-2 py-1 ml-4 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="text-sm border border-gray-300 rounded-md px-2 py-1 ml-4"
                         >
                           <option value="pending">Pending</option>
                           <option value="in-progress">In Progress</option>
