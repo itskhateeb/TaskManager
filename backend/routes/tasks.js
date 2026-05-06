@@ -8,7 +8,6 @@ const Project = require('../models/Project');
 // Get all tasks for dashboard
 router.get('/dashboard', auth, async (req, res) => {
   try {
-    // Get projects where user is member or owner
     const projects = await Project.find({
       $or: [
         { owner: req.userId },
@@ -18,13 +17,11 @@ router.get('/dashboard', auth, async (req, res) => {
     
     const projectIds = projects.map(p => p._id);
     
-    // Get all tasks from these projects
     const tasks = await Task.find({ project: { $in: projectIds } })
       .populate('project', 'name')
       .populate('assignedTo', 'name email')
       .populate('assignedBy', 'name email');
     
-    // Statistics
     const stats = {
       total: tasks.length,
       pending: tasks.filter(t => t.status === 'pending').length,
@@ -34,11 +31,11 @@ router.get('/dashboard', auth, async (req, res) => {
       highPriority: tasks.filter(t => t.priority === 'high' || t.priority === 'urgent').length
     };
     
-    // My tasks (assigned to current user)
-    const myTasks = tasks.filter(t => t.assignedTo._id.toString() === req.userId);
+    const myTasks = tasks.filter(t => t.assignedTo && t.assignedTo._id && t.assignedTo._id.toString() === req.userId);
     
     res.json({ tasks, myTasks, stats });
   } catch (error) {
+    console.error('Dashboard error:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -64,45 +61,51 @@ router.post('/', auth, roleCheck('admin'), async (req, res) => {
     });
     
     await task.save();
-    await task.populate('assignedTo', 'name email')
+    
+    const populatedTask = await Task.findById(task._id)
+      .populate('assignedTo', 'name email')
       .populate('assignedBy', 'name email')
       .populate('project', 'name');
     
-    res.status(201).json(task);
+    res.status(201).json(populatedTask);
   } catch (error) {
+    console.error('Error creating task:', error);
     res.status(400).json({ error: error.message });
   }
 });
 
-// Update task status (Members can update their assigned tasks)
+// Update task status
 router.patch('/:id/status', auth, async (req, res) => {
   try {
     const { status } = req.body;
+    
+    const validStatuses = ['pending', 'in-progress', 'completed', 'overdue'];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({ error: 'Invalid status value' });
+    }
+    
     const task = await Task.findById(req.params.id);
     
     if (!task) {
       return res.status(404).json({ error: 'Task not found' });
     }
     
-    // Check if user has access to this task
-    const project = await Project.findById(task.project);
-    const hasAccess = project.owner.toString() === req.userId || 
-                     project.members.includes(req.userId);
-    
-    if (!hasAccess) {
-      return res.status(403).json({ error: 'Access denied' });
-    }
-    
     task.status = status;
     await task.save();
     
-    res.json(task);
+    const updatedTask = await Task.findById(task._id)
+      .populate('assignedTo', 'name email')
+      .populate('assignedBy', 'name email')
+      .populate('project', 'name');
+    
+    res.json(updatedTask);
   } catch (error) {
+    console.error('Error updating task status:', error);
     res.status(400).json({ error: error.message });
   }
 });
 
-// Update task (Admin only)
+// Update full task (Admin only)
 router.put('/:id', auth, roleCheck('admin'), async (req, res) => {
   try {
     const task = await Task.findById(req.params.id);
@@ -120,11 +123,13 @@ router.put('/:id', auth, roleCheck('admin'), async (req, res) => {
     if (status) task.status = status;
     
     await task.save();
-    await task.populate('assignedTo', 'name email')
+    
+    const populatedTask = await Task.findById(task._id)
+      .populate('assignedTo', 'name email')
       .populate('assignedBy', 'name email')
       .populate('project', 'name');
     
-    res.json(task);
+    res.json(populatedTask);
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
