@@ -8,7 +8,7 @@ const Project = require('../models/Project');
 // Get all tasks for dashboard
 router.get('/dashboard', auth, async (req, res) => {
   try {
-    // Get projects where user is member or owner
+    // First, get all projects where user is member or owner
     const projects = await Project.find({
       $or: [
         { owner: req.userId },
@@ -18,12 +18,34 @@ router.get('/dashboard', auth, async (req, res) => {
     
     const projectIds = projects.map(p => p._id);
     
-    // Get all tasks from these projects
-    const tasks = await Task.find({ project: { $in: projectIds } })
+    // Get tasks from those projects
+    let tasks = await Task.find({ project: { $in: projectIds } })
       .populate('project', 'name')
       .populate('assignedTo', 'name email')
       .populate('assignedBy', 'name email');
     
+    // ALSO get tasks directly assigned to the user (even if not in project members)
+    const directlyAssignedTasks = await Task.find({ assignedTo: req.userId })
+      .populate('project', 'name')
+      .populate('assignedTo', 'name email')
+      .populate('assignedBy', 'name email');
+    
+    // Merge both sets of tasks (remove duplicates by _id)
+    const allTasksMap = new Map();
+    
+    tasks.forEach(task => {
+      allTasksMap.set(task._id.toString(), task);
+    });
+    
+    directlyAssignedTasks.forEach(task => {
+      if (!allTasksMap.has(task._id.toString())) {
+        allTasksMap.set(task._id.toString(), task);
+      }
+    });
+    
+    tasks = Array.from(allTasksMap.values());
+    
+    // Calculate stats for all tasks user can see
     const stats = {
       total: tasks.length,
       pending: tasks.filter(t => t.status === 'pending').length,
@@ -33,14 +55,18 @@ router.get('/dashboard', auth, async (req, res) => {
       highPriority: tasks.filter(t => t.priority === 'high' || t.priority === 'urgent').length
     };
     
-    // IMPORTANT FIX: Only show tasks assigned to current user
+    // IMPORTANT: Show tasks assigned to current user
     const myTasks = tasks.filter(task => {
       if (!task.assignedTo) return false;
       const assignedToId = typeof task.assignedTo === 'object' ? task.assignedTo._id : task.assignedTo;
-      return assignedToId.toString() === req.userId;
+      const isAssigned = assignedToId.toString() === req.userId;
+      if (isAssigned) {
+        console.log(`Task "${task.title}" is assigned to user ${req.userId}`);
+      }
+      return isAssigned;
     });
     
-    console.log(`User ${req.userId} has ${myTasks.length} assigned tasks out of ${tasks.length} total`);
+    console.log(`User ${req.userId} - Total visible tasks: ${tasks.length}, Assigned to user: ${myTasks.length}`);
     
     res.json({ tasks, myTasks, stats });
   } catch (error) {
@@ -83,7 +109,7 @@ router.post('/', auth, roleCheck('admin'), async (req, res) => {
   }
 });
 
-// Update task status - FIXED: Only assigned user or admin can update
+// Update task status - Only assigned user or admin can update
 router.patch('/:id/status', auth, async (req, res) => {
   try {
     const { status } = req.body;
@@ -107,11 +133,10 @@ router.patch('/:id/status', auth, async (req, res) => {
     const isAdmin = req.user.role === 'admin';
     const isAssignedToUser = assignedToId.toString() === req.userId;
     
-    console.log(`Task update - User: ${req.userId}, Role: ${req.user.role}, AssignedTo: ${assignedToId}, IsAdmin: ${isAdmin}, IsAssigned: ${isAssignedToUser}`);
+    console.log(`Task update - User: ${req.user.email}, IsAdmin: ${isAdmin}, IsAssigned: ${isAssignedToUser}`);
     
     // Only admin or the assigned person can update task status
     if (!isAdmin && !isAssignedToUser) {
-      console.log('Access denied: User not authorized to update this task');
       return res.status(403).json({ error: 'Access denied. You can only update tasks assigned to you.' });
     }
     
@@ -122,8 +147,6 @@ router.patch('/:id/status', auth, async (req, res) => {
       .populate('assignedTo', 'name email')
       .populate('assignedBy', 'name email')
       .populate('project', 'name');
-    
-    console.log(`Task ${task._id} status updated to ${status} by ${req.user.email}`);
     
     res.json(updatedTask);
   } catch (error) {
