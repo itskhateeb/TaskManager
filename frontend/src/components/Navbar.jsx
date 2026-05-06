@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { LogOut, Users, LayoutDashboard, FolderGit2, Shield } from 'lucide-react';
+import { LogOut, LayoutDashboard, FolderGit2, Shield } from 'lucide-react';
 
 const Navbar = () => {
   const { user, logout } = useAuth();
@@ -32,7 +32,7 @@ const Navbar = () => {
               {user?.role === 'admin' && (
                 <Link to="/admin" className="flex items-center space-x-2 text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md transition">
                   <Shield size={18} />
-                  <span>Admin Panel</span>
+                  <span>Admin</span>
                 </Link>
               )}
             </div>
