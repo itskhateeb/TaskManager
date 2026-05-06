@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import API from '../utils/api';
 
 const Dashboard = () => {
   const { user } = useAuth();
   const [stats, setStats] = useState({});
   const [myTasks, setMyTasks] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     fetchDashboardData();
@@ -14,11 +14,36 @@ const Dashboard = () => {
 
   const fetchDashboardData = async () => {
     try {
-      const { data } = await API.get('/tasks/dashboard');
+      setError(null);
+      const token = localStorage.getItem('token');
+      
+      console.log('Fetching dashboard data...');
+      console.log('Token exists:', !!token);
+      
+      const response = await fetch('http://localhost:5000/api/tasks/dashboard', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      console.log('Response status:', response.status);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      console.log('Dashboard data received:', data);
+      
       setStats(data.stats || {});
       setMyTasks(data.myTasks || []);
+      
+      console.log('My tasks count:', data.myTasks?.length);
+      
     } catch (error) {
       console.error('Error fetching dashboard:', error);
+      setError(error.message);
     } finally {
       setLoading(false);
     }
@@ -26,11 +51,37 @@ const Dashboard = () => {
 
   const updateTaskStatus = async (taskId, newStatus) => {
     try {
-      await API.patch(`/tasks/${taskId}/status`, { status: newStatus });
-      fetchDashboardData();
+      const token = localStorage.getItem('token');
+      
+      console.log('Updating task:', taskId, 'to:', newStatus);
+      
+      const response = await fetch(`http://localhost:5000/api/tasks/${taskId}/status`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ status: newStatus })
+      });
+      
+      console.log('Update response status:', response.status);
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Update failed');
+      }
+      
+      const data = await response.json();
+      console.log('Update successful:', data);
+      
+      alert(`Task status updated to ${newStatus}!`);
+      
+      // Refresh dashboard
+      await fetchDashboardData();
+      
     } catch (error) {
       console.error('Error updating task:', error);
-      alert('Failed to update task status');
+      alert(`Failed to update task: ${error.message}`);
     }
   };
 
@@ -48,6 +99,23 @@ const Dashboard = () => {
     return (
       <div className="flex justify-center items-center h-64">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <p className="ml-3 text-gray-600">Loading dashboard...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 py-8">
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+          <p>Error loading dashboard: {error}</p>
+          <button 
+            onClick={fetchDashboardData}
+            className="mt-2 bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700"
+          >
+            Retry
+          </button>
+        </div>
       </div>
     );
   }
@@ -120,7 +188,7 @@ const Dashboard = () => {
         {myTasks.length === 0 ? (
           <div className="text-center py-12">
             <p className="text-gray-500">No tasks assigned to you yet.</p>
-            <p className="text-sm text-gray-400 mt-2">Go to Projects and create your first task!</p>
+            <p className="text-sm text-gray-400 mt-2">Ask an admin to assign you some tasks!</p>
           </div>
         ) : (
           <div className="space-y-4">
@@ -150,7 +218,7 @@ const Dashboard = () => {
                   <select
                     value={task.status}
                     onChange={(e) => updateTaskStatus(task._id, e.target.value)}
-                    className="text-sm border border-gray-300 rounded-md px-2 py-1 ml-4"
+                    className="text-sm border border-gray-300 rounded-md px-2 py-1 ml-4 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="pending">Pending</option>
                     <option value="in-progress">In Progress</option>
