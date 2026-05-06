@@ -1,51 +1,3 @@
-const express = require('express');
-const router = express.Router();
-const jwt = require('jsonwebtoken');
-const User = require('../models/User');
-const auth = require('../middleware/auth');
-const bcrypt = require('bcryptjs');
-
-// Signup
-router.post('/signup', async (req, res) => {
-  try {
-    const { name, email, password, role } = req.body;
-    
-    console.log('Signup attempt:', { name, email, role });
-    
-    // Check if user exists
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      return res.status(400).json({ error: 'Email already exists' });
-    }
-    
-    // Create user (password will be hashed by pre-save hook)
-    const user = new User({ 
-      name, 
-      email, 
-      password, 
-      role: role || 'member' 
-    });
-    
-    await user.save();
-    
-    // Generate token
-    const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
-    
-    res.status(201).json({
-      token,
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role
-      }
-    });
-  } catch (error) {
-    console.error('Signup error:', error);
-    res.status(400).json({ error: error.message });
-  }
-});
-
 // Login
 router.post('/login', async (req, res) => {
   try {
@@ -61,11 +13,11 @@ router.post('/login', async (req, res) => {
     }
     
     console.log('User found:', user.email, 'Role:', user.role);
-    console.log('Stored password hash length:', user.password.length);
+    console.log('Stored password:', user.password);
     
-    // Check password
-    const isValid = await bcrypt.compare(password, user.password);
-    console.log('Password valid:', isValid);
+    // Use the comparePassword method
+    const isValid = await user.comparePassword(password);
+    console.log('Password match result:', isValid);
     
     if (!isValid) {
       console.log('Invalid password for:', email);
@@ -91,10 +43,3 @@ router.post('/login', async (req, res) => {
     res.status(400).json({ error: error.message });
   }
 });
-
-// Get current user
-router.get('/me', auth, async (req, res) => {
-  res.json(req.user);
-});
-
-module.exports = router;

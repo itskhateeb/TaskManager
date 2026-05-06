@@ -29,18 +29,8 @@ const userSchema = new mongoose.Schema({
   }
 });
 
-// Only hash password if it's modified AND not already hashed
-userSchema.pre('save', async function(next) {
-  if (!this.isModified('password')) return next();
-  
-  // Check if password is already hashed (bcrypt hashes start with $2b$)
-  if (this.password.startsWith('$2b$')) {
-    return next();
-  }
-  
-  this.password = await bcrypt.hash(this.password, 10);
-  next();
-});
+// Remove pre-save hook - we'll hash password manually in routes
+// This prevents double hashing issues
 
 userSchema.methods.comparePassword = async function(password) {
   return await bcrypt.compare(password, this.password);

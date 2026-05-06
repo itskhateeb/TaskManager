@@ -21,11 +21,16 @@ router.post('/users', auth, roleCheck('admin'), async (req, res) => {
   try {
     const { name, email, password, role } = req.body;
     
-    console.log('Admin creating user:', { name, email, role, passwordLength: password?.length });
+    console.log('=== Admin Creating User ===');
+    console.log('Name:', name);
+    console.log('Email:', email);
+    console.log('Role:', role);
+    console.log('Raw password:', password);
     
     // Check if user exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
+      console.log('User already exists:', email);
       return res.status(400).json({ error: 'Email already exists' });
     }
     
@@ -34,11 +39,9 @@ router.post('/users', auth, roleCheck('admin'), async (req, res) => {
       return res.status(400).json({ error: 'Password must be at least 6 characters' });
     }
     
-    // Hash password manually
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
-    
-    console.log('Password hashed successfully');
+    // Hash the password using the SAME method as signup
+    const hashedPassword = await bcrypt.hash(password, 10);
+    console.log('Hashed password:', hashedPassword);
     
     // Create user with hashed password
     const user = new User({
@@ -49,8 +52,16 @@ router.post('/users', auth, roleCheck('admin'), async (req, res) => {
     });
     
     await user.save();
+    console.log('User saved successfully with hashed password');
     
-    console.log('User created successfully:', user.email, user.role);
+    // Verify the password was saved correctly
+    const savedUser = await User.findOne({ email });
+    console.log('Verification - Password in DB:', savedUser.password);
+    console.log('Verification - Password hash length:', savedUser.password.length);
+    
+    // Test if password matches
+    const testMatch = await bcrypt.compare(password, savedUser.password);
+    console.log('Test password match:', testMatch);
     
     res.status(201).json({ 
       message: 'User created successfully', 
