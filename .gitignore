@@ -17,3 +17,5 @@ npm-debug.log*
 # OS
 Thumbs.db" > .gitignoreecho "# Team Task Manager
 
+frontend/node_modules
+frontend/dist
