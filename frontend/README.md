@@ -1,16 +1,41 @@
-# React + Vite
+# TaskFlow - Team Task Manager
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A full-stack team task management application with role-based access control (Admin/Member), project management, and task tracking.
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- User Authentication (Signup/Login with JWT)
+- Role-Based Access Control (Admin and Member roles)
+- Project Management (Create, Read, Update, Delete projects)
+- Task Management (Create, assign, track tasks with status and priority)
+- Dashboard with task statistics and personal task list
+- Admin Panel for user management
+- Responsive UI with Tailwind CSS
 
-## React Compiler
+## Tech Stack
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+### Backend
+- Node.js with Express.js
+- MongoDB with Mongoose ODM
+- JWT for authentication
+- bcryptjs for password hashing
 
-## Expanding the ESLint configuration
+### Frontend
+- React 18 with Vite
+- Tailwind CSS for styling
+- Axios for API calls
+- React Router DOM for navigation
+- Lucide React for icons
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## Installation
+
+### Prerequisites
+- Node.js (v14 or higher)
+- MongoDB Atlas account or local MongoDB
+
+### Setup
+
+1. Clone the repository
+```bash
+git clone <your-repo-url>
+cd TaskManager

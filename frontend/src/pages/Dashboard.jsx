@@ -6,6 +6,7 @@ const Dashboard = () => {
   const { user } = useAuth();
   const [stats, setStats] = useState({});
   const [myTasks, setMyTasks] = useState([]);
+  const [allTasks, setAllTasks] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -14,9 +15,38 @@ const Dashboard = () => {
 
   const fetchDashboardData = async () => {
     try {
-      const { data } = await API.get('/tasks/dashboard');
-      setStats(data.stats || {});
-      setMyTasks(data.myTasks || []);
+      // Get all projects first
+      const projectsRes = await API.get('/projects');
+      const projects = projectsRes.data;
+      
+      // Get all tasks
+      const tasksRes = await API.get('/tasks/dashboard');
+      console.log('Full response:', tasksRes.data);
+      
+      const allTasksData = tasksRes.data.tasks || [];
+      setAllTasks(allTasksData);
+      
+      // Calculate stats
+      const statsData = {
+        total: allTasksData.length,
+        pending: allTasksData.filter(t => t.status === 'pending').length,
+        inProgress: allTasksData.filter(t => t.status === 'in-progress').length,
+        completed: allTasksData.filter(t => t.status === 'completed').length,
+        overdue: allTasksData.filter(t => t.status === 'overdue').length
+      };
+      setStats(statsData);
+      
+      // Filter tasks assigned to current user
+      const userTasks = allTasksData.filter(task => {
+        if (!task.assignedTo) return false;
+        const assignedToId = typeof task.assignedTo === 'object' ? task.assignedTo._id : task.assignedTo;
+        return assignedToId === user?._id;
+      });
+      
+      console.log('User ID:', user?._id);
+      console.log('Filtered user tasks:', userTasks);
+      setMyTasks(userTasks);
+      
     } catch (error) {
       console.error('Error fetching dashboard:', error);
     } finally {
@@ -28,6 +58,7 @@ const Dashboard = () => {
     try {
       await API.patch(`/tasks/${taskId}/status`, { status: newStatus });
       fetchDashboardData();
+      alert(`Task status updated to ${newStatus}!`);
     } catch (error) {
       console.error('Error updating task:', error);
       alert('Failed to update task status');
