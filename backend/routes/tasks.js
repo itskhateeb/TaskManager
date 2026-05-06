@@ -8,7 +8,7 @@ const Project = require('../models/Project');
 // Get all tasks for dashboard
 router.get('/dashboard', auth, async (req, res) => {
   try {
-    // Get projects where user is member or owner
+    // First, get all projects where user is member or owner
     const projects = await Project.find({
       $or: [
         { owner: req.userId },
@@ -18,12 +18,34 @@ router.get('/dashboard', auth, async (req, res) => {
     
     const projectIds = projects.map(p => p._id);
     
-    // Get all tasks from these projects
-    const tasks = await Task.find({ project: { $in: projectIds } })
+    // Get tasks from those projects
+    let tasks = await Task.find({ project: { $in: projectIds } })
       .populate('project', 'name')
       .populate('assignedTo', 'name email')
       .populate('assignedBy', 'name email');
     
+    // ALSO get tasks directly assigned to the user (even if not in project members)
+    const directlyAssignedTasks = await Task.find({ assignedTo: req.userId })
+      .populate('project', 'name')
+      .populate('assignedTo', 'name email')
+      .populate('assignedBy', 'name email');
+    
+    // Merge both sets of tasks (remove duplicates by _id)
+    const allTasksMap = new Map();
+    
+    tasks.forEach(task => {
+      allTasksMap.set(task._id.toString(), task);
+    });
+    
+    directlyAssignedTasks.forEach(task => {
+      if (!allTasksMap.has(task._id.toString())) {
+        allTasksMap.set(task._id.toString(), task);
+      }
+    });
+    
+    tasks = Array.from(allTasksMap.values());
+    
+    // Calculate stats for all tasks user can see
     const stats = {
       total: tasks.length,
       pending: tasks.filter(t => t.status === 'pending').length,
@@ -33,14 +55,14 @@ router.get('/dashboard', auth, async (req, res) => {
       highPriority: tasks.filter(t => t.priority === 'high' || t.priority === 'urgent').length
     };
     
-    // IMPORTANT FIX: Only show tasks assigned to current user
+    // Show tasks assigned to current user
     const myTasks = tasks.filter(task => {
       if (!task.assignedTo) return false;
       const assignedToId = typeof task.assignedTo === 'object' ? task.assignedTo._id : task.assignedTo;
       return assignedToId.toString() === req.userId;
     });
     
-    console.log(`User ${req.userId} has ${myTasks.length} assigned tasks out of ${tasks.length} total`);
+    console.log(`User ${req.userId} - Total: ${tasks.length}, Assigned: ${myTasks.length}`);
     
     res.json({ tasks, myTasks, stats });
   } catch (error) {
@@ -83,47 +105,63 @@ router.post('/', auth, roleCheck('admin'), async (req, res) => {
   }
 });
 
-// Update task status - FIXED: Only assigned user or admin can update
+// Update task status - FIXED: Assigned user can update their own tasks
 router.patch('/:id/status', auth, async (req, res) => {
   try {
     const { status } = req.body;
+    const taskId = req.params.id;
+    
+    console.log('========================================');
+    console.log('Status Update Request:');
+    console.log('Task ID:', taskId);
+    console.log('New Status:', status);
+    console.log('User ID:', req.userId);
+    console.log('User Role:', req.user.role);
+    console.log('User Email:', req.user.email);
     
     const validStatuses = ['pending', 'in-progress', 'completed', 'overdue'];
     if (!validStatuses.includes(status)) {
       return res.status(400).json({ error: 'Invalid status value' });
     }
     
-    const task = await Task.findById(req.params.id)
-      .populate('assignedTo', 'name email');
+    // Find the task
+    const task = await Task.findById(taskId);
     
     if (!task) {
+      console.log('Task not found:', taskId);
       return res.status(404).json({ error: 'Task not found' });
     }
     
-    // Get the assigned user ID
-    const assignedToId = typeof task.assignedTo === 'object' ? task.assignedTo._id : task.assignedTo;
+    console.log('Task found:');
+    console.log('Task Title:', task.title);
+    console.log('Task AssignedTo:', task.assignedTo);
+    console.log('Task Current Status:', task.status);
     
     // Check if user is admin OR the task is assigned to them
     const isAdmin = req.user.role === 'admin';
-    const isAssignedToUser = assignedToId.toString() === req.userId;
+    const isAssignedToUser = task.assignedTo.toString() === req.userId;
     
-    console.log(`Task update - User: ${req.userId}, Role: ${req.user.role}, AssignedTo: ${assignedToId}, IsAdmin: ${isAdmin}, IsAssigned: ${isAssignedToUser}`);
+    console.log('Is Admin:', isAdmin);
+    console.log('Is Assigned to User:', isAssignedToUser);
     
     // Only admin or the assigned person can update task status
     if (!isAdmin && !isAssignedToUser) {
-      console.log('Access denied: User not authorized to update this task');
+      console.log('ACCESS DENIED: User not authorized');
       return res.status(403).json({ error: 'Access denied. You can only update tasks assigned to you.' });
     }
     
+    // Update the status
     task.status = status;
     await task.save();
     
-    const updatedTask = await Task.findById(task._id)
+    console.log('Task status updated successfully to:', status);
+    console.log('========================================');
+    
+    // Return updated task with populated fields
+    const updatedTask = await Task.findById(taskId)
       .populate('assignedTo', 'name email')
       .populate('assignedBy', 'name email')
       .populate('project', 'name');
-    
-    console.log(`Task ${task._id} status updated to ${status} by ${req.user.email}`);
     
     res.json(updatedTask);
   } catch (error) {
