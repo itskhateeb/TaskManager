@@ -1,15 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import API from '../utils/api';
 
 const Dashboard = () => {
   const { user } = useAuth();
-  const [stats, setStats] = useState({
-    total: 0,
-    pending: 0,
-    inProgress: 0,
-    completed: 0,
-    overdue: 0
-  });
+  const [stats, setStats] = useState({});
   const [myTasks, setMyTasks] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -19,25 +14,11 @@ const Dashboard = () => {
 
   const fetchDashboardData = async () => {
     try {
-      setLoading(true);
-      const token = localStorage.getItem('token');
-      
-      const response = await fetch('http://localhost:5000/api/tasks/dashboard', {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      
-      const data = await response.json();
-      console.log('Dashboard data:', data);
-      
+      const { data } = await API.get('/tasks/dashboard');
       setStats(data.stats || {});
       setMyTasks(data.myTasks || []);
-      
     } catch (error) {
-      console.error('Error:', error);
+      console.error('Error fetching dashboard:', error);
     } finally {
       setLoading(false);
     }
@@ -45,26 +26,11 @@ const Dashboard = () => {
 
   const updateTaskStatus = async (taskId, newStatus) => {
     try {
-      const token = localStorage.getItem('token');
-      
-      const response = await fetch(`http://localhost:5000/api/tasks/${taskId}/status`, {
-        method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ status: newStatus })
-      });
-      
-      if (response.ok) {
-        alert(`Task status updated to ${newStatus}!`);
-        fetchDashboardData();
-      } else {
-        alert('Failed to update status');
-      }
+      await API.patch(`/tasks/${taskId}/status`, { status: newStatus });
+      fetchDashboardData();
     } catch (error) {
-      console.error('Error:', error);
-      alert('Failed to update status');
+      console.error('Error updating task:', error);
+      alert('Failed to update task status');
     }
   };
 
@@ -78,21 +44,10 @@ const Dashboard = () => {
     return colors[status] || 'bg-gray-100 text-gray-800';
   };
 
-  const getPriorityColor = (priority) => {
-    const colors = {
-      'low': 'bg-gray-100 text-gray-800',
-      'medium': 'bg-blue-100 text-blue-800',
-      'high': 'bg-orange-100 text-orange-800',
-      'urgent': 'bg-red-100 text-red-800'
-    };
-    return colors[priority] || 'bg-gray-100 text-gray-800';
-  };
-
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-        <p className="ml-3 text-gray-600">Loading...</p>
       </div>
     );
   }
@@ -159,14 +114,13 @@ const Dashboard = () => {
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-xl font-bold text-gray-900">My Tasks</h2>
-          <span className="text-sm text-gray-500">{myTasks.length} tasks</span>
+          <span className="text-sm text-gray-500">{myTasks.length} tasks assigned</span>
         </div>
 
         {myTasks.length === 0 ? (
           <div className="text-center py-12">
-            <div className="text-6xl mb-4">📭</div>
-            <p className="text-gray-500 text-lg">No tasks found</p>
-            <p className="text-sm text-gray-400 mt-2">Create a task from Projects page</p>
+            <p className="text-gray-500">No tasks assigned to you yet.</p>
+            <p className="text-sm text-gray-400 mt-2">Go to Projects and create your first task!</p>
           </div>
         ) : (
           <div className="space-y-4">
@@ -174,17 +128,21 @@ const Dashboard = () => {
               <div key={task._id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
-                    <div className="flex items-center space-x-3 mb-2 flex-wrap gap-2">
+                    <div className="flex items-center space-x-3 mb-2">
                       <h3 className="font-semibold text-gray-900">{task.title}</h3>
                       <span className={`px-2 py-1 text-xs rounded-full ${getStatusColor(task.status)}`}>
                         {task.status}
                       </span>
-                      <span className={`px-2 py-1 text-xs rounded-full ${getPriorityColor(task.priority)}`}>
+                      <span className={`px-2 py-1 text-xs rounded-full ${
+                        task.priority === 'high' || task.priority === 'urgent' 
+                          ? 'bg-red-100 text-red-800' 
+                          : 'bg-gray-100 text-gray-800'
+                      }`}>
                         {task.priority}
                       </span>
                     </div>
                     <p className="text-gray-600 text-sm mb-2">{task.description}</p>
-                    <div className="flex items-center space-x-4 text-xs text-gray-500">
+                    <div className="flex items-center space-x-4 text-sm text-gray-500">
                       <span>Project: {task.project?.name}</span>
                       <span>Due: {new Date(task.dueDate).toLocaleDateString()}</span>
                     </div>
