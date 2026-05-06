@@ -16,12 +16,12 @@ router.get('/users', auth, roleCheck('admin'), async (req, res) => {
   }
 });
 
-// Create user (Admin only)
+// Create user (Admin only) - FIXED VERSION
 router.post('/users', auth, roleCheck('admin'), async (req, res) => {
   try {
     const { name, email, password, role } = req.body;
     
-    console.log('Creating user with data:', { name, email, role });
+    console.log('Creating user with data:', { name, email, role, passwordLength: password?.length });
     
     // Check if user exists
     const existingUser = await User.findOne({ email });
@@ -34,10 +34,11 @@ router.post('/users', auth, roleCheck('admin'), async (req, res) => {
       return res.status(400).json({ error: 'Password must be at least 6 characters' });
     }
     
-    // Hash password
-    const hashedPassword = await bcrypt.hash(password, 10);
+    // Hash password properly
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
     
-    // Create user
+    // Create user with hashed password
     const user = new User({
       name,
       email,
@@ -47,15 +48,20 @@ router.post('/users', auth, roleCheck('admin'), async (req, res) => {
     
     await user.save();
     
+    // Return user without password
+    const userResponse = {
+      id: user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      createdAt: user.createdAt
+    };
+    
+    console.log('User created successfully:', userResponse);
+    
     res.status(201).json({ 
       message: 'User created successfully', 
-      user: { 
-        id: user._id, 
-        name: user.name, 
-        email: user.email, 
-        role: user.role,
-        createdAt: user.createdAt
-      } 
+      user: userResponse 
     });
   } catch (error) {
     console.error('Error creating user:', error);

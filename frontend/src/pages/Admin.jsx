@@ -48,11 +48,28 @@ const handleCreateUser = async (e) => {
   }
   
   try {
-    console.log('Creating user:', formData);
-    const response = await API.post('/admin/users', formData);
-    console.log('Create response:', response.data);
+    console.log('Sending user data:', { 
+      name: formData.name, 
+      email: formData.email, 
+      password: formData.password, 
+      role: formData.role 
+    });
     
-    alert('User created successfully!');
+    const response = await API.post('/admin/users', {
+      name: formData.name,
+      email: formData.email,
+      password: formData.password,
+      role: formData.role
+    });
+    
+    console.log('Server response:', response.data);
+    
+    if (response.data.message) {
+      alert(response.data.message);
+    } else {
+      alert('User created successfully!');
+    }
+    
     fetchData();
     setShowUserModal(false);
     setFormData({ name: '', email: '', password: '', role: 'member' });
