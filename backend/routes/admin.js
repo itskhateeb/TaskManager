@@ -21,10 +21,17 @@ router.post('/users', auth, roleCheck('admin'), async (req, res) => {
   try {
     const { name, email, password, role } = req.body;
     
+    console.log('Creating user with data:', { name, email, role });
+    
     // Check if user exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       return res.status(400).json({ error: 'Email already exists' });
+    }
+    
+    // Validate password
+    if (!password || password.length < 6) {
+      return res.status(400).json({ error: 'Password must be at least 6 characters' });
     }
     
     // Hash password
@@ -46,7 +53,8 @@ router.post('/users', auth, roleCheck('admin'), async (req, res) => {
         id: user._id, 
         name: user.name, 
         email: user.email, 
-        role: user.role 
+        role: user.role,
+        createdAt: user.createdAt
       } 
     });
   } catch (error) {

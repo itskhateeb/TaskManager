@@ -34,24 +34,34 @@ const Admin = () => {
     }
   };
 
-  const handleCreateUser = async (e) => {
-    e.preventDefault();
-    if (formData.password.length < 6) {
-      alert('Password must be at least 6 characters');
-      return;
-    }
+const handleCreateUser = async (e) => {
+  e.preventDefault();
+  
+  if (!formData.name || !formData.email || !formData.password) {
+    alert('Please fill all fields');
+    return;
+  }
+  
+  if (formData.password.length < 6) {
+    alert('Password must be at least 6 characters');
+    return;
+  }
+  
+  try {
+    console.log('Creating user:', formData);
+    const response = await API.post('/admin/users', formData);
+    console.log('Create response:', response.data);
     
-    try {
-      await API.post('/admin/users', formData);
-      alert('User created successfully!');
-      fetchData();
-      setShowUserModal(false);
-      setFormData({ name: '', email: '', password: '', role: 'member' });
-    } catch (error) {
-      console.error('Error creating user:', error);
-      alert(error.response?.data?.error || 'Failed to create user');
-    }
-  };
+    alert('User created successfully!');
+    fetchData();
+    setShowUserModal(false);
+    setFormData({ name: '', email: '', password: '', role: 'member' });
+  } catch (error) {
+    console.error('Error creating user:', error);
+    const errorMessage = error.response?.data?.error || 'Failed to create user';
+    alert(errorMessage);
+  }
+};
 
   const handleDeleteUser = async (userId, userName) => {
     if (window.confirm(`Are you sure you want to delete user "${userName}"?`)) {
