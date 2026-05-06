@@ -8,29 +8,20 @@ const Project = require('../models/Project');
 // Get all tasks for dashboard
 router.get('/dashboard', auth, async (req, res) => {
   try {
-    console.log('=== DASHBOARD REQUEST ===');
-    console.log('User ID:', req.userId);
-    console.log('User Email:', req.user.email);
+    const projects = await Project.find({
+      $or: [
+        { owner: req.userId },
+        { members: req.userId }
+      ]
+    });
     
-    // Get all projects
-    const projects = await Project.find();
     const projectIds = projects.map(p => p._id);
     
-    // Get all tasks
-    let tasks = await Task.find()
+    const tasks = await Task.find({ project: { $in: projectIds } })
       .populate('project', 'name')
       .populate('assignedTo', 'name email')
       .populate('assignedBy', 'name email');
     
-    console.log('Total tasks in DB:', tasks.length);
-    
-    // TEMPORARY FIX: Show ALL tasks to the user
-    // This will ensure tasks are visible
-    const myTasks = tasks;
-    
-    console.log('My tasks (all tasks):', myTasks.length);
-    
-    // Calculate stats
     const stats = {
       total: tasks.length,
       pending: tasks.filter(t => t.status === 'pending').length,
@@ -39,6 +30,8 @@ router.get('/dashboard', auth, async (req, res) => {
       overdue: tasks.filter(t => t.status === 'overdue').length,
       highPriority: tasks.filter(t => t.priority === 'high' || t.priority === 'urgent').length
     };
+    
+    const myTasks = tasks.filter(t => t.assignedTo && t.assignedTo._id && t.assignedTo._id.toString() === req.userId);
     
     res.json({ tasks, myTasks, stats });
   } catch (error) {
@@ -85,9 +78,13 @@ router.post('/', auth, roleCheck('admin'), async (req, res) => {
 router.patch('/:id/status', auth, async (req, res) => {
   try {
     const { status } = req.body;
-    const taskId = req.params.id;
     
-    const task = await Task.findById(taskId);
+    const validStatuses = ['pending', 'in-progress', 'completed', 'overdue'];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({ error: 'Invalid status value' });
+    }
+    
+    const task = await Task.findById(req.params.id);
     
     if (!task) {
       return res.status(404).json({ error: 'Task not found' });
@@ -96,7 +93,7 @@ router.patch('/:id/status', auth, async (req, res) => {
     task.status = status;
     await task.save();
     
-    const updatedTask = await Task.findById(taskId)
+    const updatedTask = await Task.findById(task._id)
       .populate('assignedTo', 'name email')
       .populate('assignedBy', 'name email')
       .populate('project', 'name');
